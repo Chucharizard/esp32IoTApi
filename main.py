@@ -2,19 +2,26 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Dict
 import json
 import os
 
-# Obtener puerto de variable de entorno (Railway la proporciona automáticamente)
-port = int(os.getenv("PORT", "8000"))
-
-app = FastAPI()
 # Crear directorios necesarios si no existen
 os.makedirs("static", exist_ok=True)
 os.makedirs("templates", exist_ok=True)
 
 app = FastAPI()
+
+# Configurar CORS para permitir conexiones desde cualquier origen
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Permite todos los orígenes
+    allow_credentials=True,
+    allow_methods=["*"],  # Permite todos los métodos
+    allow_headers=["*"],  # Permite todos los headers
+)
+
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -51,10 +58,15 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# Ruta para la página web
-@app.get("/", response_class=HTMLResponse)
-async def get(request: Request):
+# Ruta para verificar que la API está funcionando
+@app.get("/")
+async def root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
+
+# Ruta para verificar el estado de la API
+@app.get("/health")
+async def health_check():
+    return {"status": "ok", "message": "API is running"}
 
 # Endpoint WebSocket para clientes web
 @app.websocket("/ws")
@@ -81,3 +93,9 @@ async def esp32_endpoint(websocket: WebSocket):
             await manager.send_to_web(data)
     except WebSocketDisconnect:
         manager.disconnect(websocket, "esp32")
+
+# Asegúrate de que la aplicación se inicie correctamente
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
