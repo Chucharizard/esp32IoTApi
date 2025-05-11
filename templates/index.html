@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Control ESP32 OLED</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .panel {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+        }
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .animation-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 15px;
+            text-align: center;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        input, textarea {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 100%;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Control de Pantalla OLED ESP32</h1>
+    
+    <div class="container">
+        <div class="panel">
+            <h2>Enviar texto</h2>
+            <div class="controls">
+                <input type="text" id="text-input" placeholder="Escribe texto para mostrar en la pantalla OLED">
+                <button onclick="sendText()">Enviar Texto</button>
+            </div>
+        </div>
+        
+        <div class="panel">
+            <h2>Animaciones</h2>
+            <div class="animation-buttons">
+                <button onclick="sendAnimation('heart')">❤️ Corazón</button>
+                <button onclick="sendAnimation('wave')">🌊 Onda</button>
+                <button onclick="sendAnimation('clock')">⏰ Reloj</button>
+                <button onclick="sendAnimation('counter')">🔢 Contador</button>
+                <button onclick="sendAnimation('progress')">📊 Barra Progreso</button>
+            </div>
+        </div>
+        
+        <div class="panel">
+            <h2>Datos recibidos de ESP32</h2>
+            <pre id="sensor-data">Esperando datos...</pre>
+        </div>
+    </div>
+    
+    <script>
+        // Conexión WebSocket
+        let ws = new WebSocket(`ws://${window.location.host}/ws`);
+        
+        // Escuchar mensajes recibidos
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            document.getElementById('sensor-data').textContent = JSON.stringify(data, null, 2);
+        };
+        
+        // Manejar cierre de conexión
+        ws.onclose = function(event) {
+            console.log('Conexión cerrada');
+            document.getElementById('sensor-data').textContent = 'Conexión cerrada';
+        };
+        
+        // Enviar texto a la ESP32
+        function sendText() {
+            const text = document.getElementById('text-input').value;
+            if (text) {
+                const data = {
+                    type: 'text',
+                    content: text
+                };
+                ws.send(JSON.stringify(data));
+            }
+        }
+        
+        // Enviar comandos de animación
+        function sendAnimation(animationType) {
+            const data = {
+                type: 'animation',
+                animation: animationType
+            };
+            ws.send(JSON.stringify(data));
+        }
+    </script>
+</body>
+</html>
