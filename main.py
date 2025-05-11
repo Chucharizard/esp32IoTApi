@@ -6,7 +6,10 @@ from typing import List, Dict
 import json
 import os
 
-PORT = int(os.getenv("PORT", 8000))
+# Obtener puerto de variable de entorno (Railway la proporciona automáticamente)
+port = int(os.getenv("PORT", "8000"))
+
+app = FastAPI()
 # Crear directorios necesarios si no existen
 os.makedirs("static", exist_ok=True)
 os.makedirs("templates", exist_ok=True)
