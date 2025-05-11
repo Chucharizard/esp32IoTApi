@@ -60,6 +60,11 @@
     
     <div class="container">
         <div class="panel">
+            <h2>Estado de la API</h2>
+            <p id="api-status">Conectando a la API...</p>
+        </div>
+
+        <div class="panel">
             <h2>Enviar texto</h2>
             <div class="controls">
                 <input type="text" id="text-input" placeholder="Escribe texto para mostrar en la pantalla OLED">
@@ -85,40 +90,90 @@
     </div>
     
     <script>
+        // Verificar estado de la API al cargar
+        fetch('/health')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('api-status').textContent = 
+                    `Estado: ${data.status} - ${data.message}`;
+            })
+            .catch(error => {
+                document.getElementById('api-status').textContent = 
+                    `Error de conexión con la API: ${error.message}`;
+            });
+
         // Conexión WebSocket
-        let ws = new WebSocket(`ws://${window.location.host}/ws`);
-        
-        // Escuchar mensajes recibidos
-        ws.onmessage = function(event) {
-            const data = JSON.parse(event.data);
-            document.getElementById('sensor-data').textContent = JSON.stringify(data, null, 2);
-        };
-        
-        // Manejar cierre de conexión
-        ws.onclose = function(event) {
-            console.log('Conexión cerrada');
-            document.getElementById('sensor-data').textContent = 'Conexión cerrada';
-        };
+        let ws;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = function() {
+                console.log('Conexión WebSocket establecida');
+                document.getElementById('api-status').textContent = 'Conectado al servidor WebSocket';
+                reconnectAttempts = 0;
+            };
+            
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                document.getElementById('sensor-data').textContent = JSON.stringify(data, null, 2);
+            };
+            
+            ws.onclose = function(event) {
+                console.log('Conexión WebSocket cerrada');
+                document.getElementById('api-status').textContent = 'Desconectado del servidor WebSocket';
+                
+                if (reconnectAttempts < maxReconnectAttempts) {
+                    reconnectAttempts++;
+                    const timeout = reconnectAttempts * 1000;
+                    console.log(`Reintentando conexión en ${timeout/1000} segundos...`);
+                    setTimeout(connectWebSocket, timeout);
+                } else {
+                    document.getElementById('api-status').textContent = 
+                        'No se pudo reconectar al servidor WebSocket después de varios intentos';
+                }
+            };
+            
+            ws.onerror = function(error) {
+                console.error('Error en la conexión WebSocket:', error);
+            };
+        }
+
+        // Iniciar conexión WebSocket
+        connectWebSocket();
         
         // Enviar texto a la ESP32
         function sendText() {
-            const text = document.getElementById('text-input').value;
-            if (text) {
-                const data = {
-                    type: 'text',
-                    content: text
-                };
-                ws.send(JSON.stringify(data));
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const text = document.getElementById('text-input').value;
+                if (text) {
+                    const data = {
+                        type: 'text',
+                        content: text
+                    };
+                    ws.send(JSON.stringify(data));
+                }
+            } else {
+                alert('La conexión al servidor WebSocket no está disponible');
             }
         }
         
         // Enviar comandos de animación
         function sendAnimation(animationType) {
-            const data = {
-                type: 'animation',
-                animation: animationType
-            };
-            ws.send(JSON.stringify(data));
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const data = {
+                    type: 'animation',
+                    animation: animationType
+                };
+                ws.send(JSON.stringify(data));
+            } else {
+                alert('La conexión al servidor WebSocket no está disponible');
+            }
         }
     </script>
 </body>
